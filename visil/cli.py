@@ -3,100 +3,133 @@ import sys
 
 
 # -------------------------
-# LOAD GRAPH
+# UTIL
 # -------------------------
-def load_graph(path):
+def load_json(path):
     with open(path, "r") as f:
         return json.load(f)
 
 
 # -------------------------
-# MAIN ENTRY
+# ENTRY
 # -------------------------
 def main():
 
     if len(sys.argv) < 2:
 
         print("""
-VISIL CLI
+VISIL CLI (Unified Cognitive Interface)
 
-COMMANDS:
-  view   <graph.json>      → run VISIL perception lens
-  replay <snapshots.json>  → reconstruct historical states
-  sigil  <event.json>      → commit event into Git history
+USAGE:
 
-RULE:
-  VISIL is read-only except SIGIL write gate
+  view   <graph.json>
+  replay <graph_or_snapshots.json>
+  field  <graph.json> [mode]
+  sigil  <event.json> <graph.json>
+
+MODES:
+  focus | time | concept | structure
+
+NOTES:
+- All operations go through VISILCorePipeline
+- Replay is unified perception over time/state
+- Field is spatial projection of attention
+- Sigil binds cognition state into Git commits
 """)
         return
 
-    mode = sys.argv[1]
+    command = sys.argv[1]
 
     # -------------------------
-    # VIEW MODE (READ ONLY)
+    # VIEW MODE
     # -------------------------
-    if mode == "view":
+    if command == "view":
+
+        from visil.core_pipeline import VISILCorePipeline
 
         if len(sys.argv) < 3:
             print("Usage: view <graph.json>")
             return
 
-        from visil.engine import VISILEngine
+        graph = load_json(sys.argv[2])
 
-        graph = load_graph(sys.argv[2])
+        pipeline = VISILCorePipeline(graph)
 
-        engine = VISILEngine(graph)
-
-        result = engine.view()
+        result = pipeline.perceive(mode="focus")
 
         print(json.dumps(result, indent=2))
         return
 
     # -------------------------
-    # REPLAY MODE (READ ONLY)
+    # REPLAY MODE
     # -------------------------
-    if mode == "replay":
-
-        if len(sys.argv) < 3:
-            print("Usage: replay <snapshots.json>")
-            return
+    if command == "replay":
 
         from visil.replay import VISILReplay
 
-        snapshots = load_graph(sys.argv[2])
+        if len(sys.argv) < 3:
+            print("Usage: replay <graph_or_snapshots.json>")
+            return
 
-        replay = VISILReplay(snapshots)
+        data = load_json(sys.argv[2])
 
-        latest = replay.latest()
+        replay = VISILReplay(data)
 
-        print(json.dumps(latest, indent=2))
+        result = replay.run(mode="focus")
+
+        print(json.dumps(result, indent=2))
         return
 
     # -------------------------
-    # SIGIL MODE (WRITE GATE)
+    # FIELD MODE (SPATIAL LENS)
     # -------------------------
-    if mode == "sigil":
+    if command == "field":
+
+        from visil.core_pipeline import VISILCorePipeline
+        from visil.field import VISILField
 
         if len(sys.argv) < 3:
-            print("Usage: sigil <event.json>")
+            print("Usage: field <graph.json> [mode]")
             return
+
+        graph = load_json(sys.argv[2])
+
+        pipeline = VISILCorePipeline(graph)
+
+        field = VISILField(pipeline)
+
+        mode = sys.argv[3] if len(sys.argv) > 3 else "focus"
+
+        result = field.compute_field(mode=mode)
+
+        print(json.dumps(result, indent=2))
+        return
+
+    # -------------------------
+    # SIGIL MODE (GIT BINDING)
+    # -------------------------
+    if command == "sigil":
 
         from visil.sigil_git import SigilGitBinder
 
+        if len(sys.argv) < 4:
+            print("Usage: sigil <event.json> <graph.json>")
+            return
+
+        event = load_json(sys.argv[2])
+        graph = load_json(sys.argv[3])
+
         binder = SigilGitBinder(".")
 
-        with open(sys.argv[2], "r") as f:
-            event = json.load(f)
+        result = binder.process_event(event, graph)
 
-        result = binder.process_event(event)
-
-        print("SIGIL committed:", event.get("id"))
+        print("SIGIL committed:", result)
         return
 
     # -------------------------
-    # UNKNOWN MODE
+    # UNKNOWN COMMAND
     # -------------------------
-    print("Unknown command:", mode)
+    print(f"Unknown command: {command}")
 
 
 if __name__ == "__main__":

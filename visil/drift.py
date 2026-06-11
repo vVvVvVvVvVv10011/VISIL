@@ -1,38 +1,34 @@
-from collections import defaultdict
+class DriftEngine:
+    """
+    VISIL Drift Layer
+    Measures structural instability over time.
+    """
 
+    def __init__(self, graph):
+        self.graph = graph
 
-class ConceptDrift:
-
-    def score(self, snapshots):
+    def compute(self, nodes):
         """
-        Measures how concepts evolve over time.
+        Returns:
+            dict[node_id] -> float drift score
         """
 
-        timeline = []
+        drift = {}
 
-        for snap in snapshots:
-            concepts = set()
+        for node_id, node in nodes.items():
 
-            for node in snap.get("graph", {}).get("nodes", {}).values():
-                concepts.update(node.get("concepts", []))
+            timestamp = node.get("timestamp", "")
+            concepts = node.get("concepts", [])
 
-            timeline.append({
-                "timestamp": snap.get("timestamp"),
-                "concepts": concepts
-            })
+            # base instability
+            time_factor = len(timestamp) * 0.01
 
-        drift_scores = []
+            # semantic volatility
+            concept_factor = abs(len(concepts) - 2) * 0.15
 
-        for i in range(1, len(timeline)):
-            prev = timeline[i - 1]["concepts"]
-            curr = timeline[i]["concepts"]
+            # missing structure penalty
+            missing = 0.2 if not concepts else 0.0
 
-            added = len(curr - prev)
-            removed = len(prev - curr)
+            drift[node_id] = time_factor + concept_factor + missing
 
-            drift_scores.append({
-                "timestamp": timeline[i]["timestamp"],
-                "drift": added + removed
-            })
-
-        return drift_scores
+        return drift

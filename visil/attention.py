@@ -1,31 +1,30 @@
-class AttentionScorer:
+class AttentionEngine:
+    """
+    VISIL Attention Layer
+    Converts node structure into salience weights.
+    """
 
-    def score_node(self, node, time_factor=1.0, structure_factor=1.0):
+    def __init__(self, graph):
+        self.graph = graph
+
+    def score(self, nodes):
         """
-        Attention = what VISIL *would focus on* if it were observing.
+        Returns:
+            dict[node_id] -> float attention score
         """
 
-        base = node.get("weight", 1.0)
+        scores = {}
 
-        concepts = len(node.get("concepts", []))
+        for node_id, node in nodes.items():
 
-        # stability = structural presence
-        structure = structure_factor
+            base = node.get("weight", 1.0)
 
-        # temporal decay = attention shift over time
-        time = time_factor
+            concepts = node.get("concepts", [])
+            concept_boost = len(concepts) * 0.25
 
-        return (base * 0.6 + concepts * 0.4) * structure * time
+            timestamp = node.get("timestamp", "")
+            recency_bias = 0.1 if timestamp else 0.0
 
-    def score_graph(self, graph):
-        nodes = graph.get("nodes", {}).values()
+            scores[node_id] = base + concept_boost + recency_bias
 
-        scored = []
-
-        for n in nodes:
-            scored.append({
-                "id": n.get("id"),
-                "attention": self.score_node(n)
-            })
-
-        return sorted(scored, key=lambda x: x["attention"], reverse=True)
+        return scores
