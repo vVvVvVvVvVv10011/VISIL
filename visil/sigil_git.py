@@ -1,63 +1,36 @@
-import json
 import subprocess
-from datetime import datetime
+from visil.sigil_state import SigilStateExtractor
 
 
 class SigilGitBinder:
 
     def __init__(self, repo_path="."):
         self.repo_path = repo_path
+        self.extractor = SigilStateExtractor(repo_path)
 
     # -------------------------
-    # APPLY EVENT TO GRAPH
+    # PROCESS EVENT → COMMIT
     # -------------------------
-    def apply_event(self, graph, event):
-        etype = event.get("type")
+    def process_event(self, event, graph):
 
-        if etype == "add":
-            node = event.get("node")
-            if node and "id" in node:
-                graph["nodes"][node["id"]] = node
-
-        elif etype == "update":
-            node = event.get("node")
-            if node and "id" in node:
-                existing = graph["nodes"].get(node["id"], {})
-                existing.update(node)
-                graph["nodes"][node["id"]] = existing
-
-        elif etype == "connect":
-            edge = event.get("edge")
-            if edge:
-                graph["edges"].append(edge)
-
-        return graph
-
-    # -------------------------
-    # COMMIT GRAPH STATE
-    # -------------------------
-    def commit_graph(self, message):
-        subprocess.run(["git", "add", "graph.json"], cwd=self.repo_path)
-
-        subprocess.run(
-            ["git", "commit", "-m", message],
-            cwd=self.repo_path
+        message = self.extractor.build_commit_message(
+            graph,
+            base_msg=event.get("message", "VISIL commit")
         )
 
+        self._git_add_all()
+        self._git_commit(message)
+
+        return message
+
     # -------------------------
-    # EVENT → COMMIT PIPELINE
+    # STAGE ALL CHANGES
     # -------------------------
-    def process_event(self, event):
-        with open("graph.json", "r") as f:
-            graph = json.load(f)
+    def _git_add_all(self):
+        subprocess.run(["git", "add", "."], cwd=self.repo_path)
 
-        graph = self.apply_event(graph, event)
-
-        with open("graph.json", "w") as f:
-            json.dump(graph, f, indent=2)
-
-        msg = f"SIGIL event {event.get('id')} @ {event.get('timestamp')}"
-
-        self.commit_graph(msg)
-
-        return graph
+    # -------------------------
+    # COMMIT
+    # -------------------------
+    def _git_commit(self, message):
+        subprocess.run(["git", "commit", "-m", message], cwd=self.repo_path)

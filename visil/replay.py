@@ -1,71 +1,66 @@
-import copy
-from datetime import datetime
+from visil.core_pipeline import VISILCorePipeline
 
 
 class VISILReplay:
 
     def __init__(self, snapshots):
-        """
-        snapshots = list of historical graph states
-        """
-        self.snapshots = sorted(
-            snapshots,
-            key=lambda s: s.get("timestamp", "")
-        )
+        self.snapshots = self.normalize(snapshots)
 
     # -------------------------
-    # GET STATE AT TIME T
+    # NORMALIZATION LAYER
     # -------------------------
-    def at_time(self, timestamp):
-        target = datetime.fromisoformat(timestamp.replace("Z", ""))
+    def normalize(self, data):
 
-        closest = None
+        # CASE 1: already list of snapshots
+        if isinstance(data, list):
+            return data
 
-        for snap in self.snapshots:
-            ts = snap.get("timestamp")
+        # CASE 2: dict of nodes (your current format)
+        if isinstance(data, dict):
 
-            if not ts:
-                continue
+            # convert graph into single snapshot
+            return [{
+                "timestamp": "latest",
+                "graph": data
+            }]
 
-            t = datetime.fromisoformat(ts.replace("Z", ""))
-
-            if t <= target:
-                closest = snap
-            else:
-                break
-
-        return copy.deepcopy(closest) if closest else None
+        return []
 
     # -------------------------
-    # REPLAY RANGE
+    # PIPELINE OVER TIME
     # -------------------------
-    def range(self, start, end):
-        start_t = datetime.fromisoformat(start.replace("Z", ""))
-        end_t = datetime.fromisoformat(end.replace("Z", ""))
+    def run(self, mode="focus"):
 
         results = []
 
         for snap in self.snapshots:
-            ts = snap.get("timestamp")
-            if not ts:
-                continue
 
-            t = datetime.fromisoformat(ts.replace("Z", ""))
+            # SAFE EXTRACTION
+            graph = snap.get("graph") or snap
 
-            if start_t <= t <= end_t:
-                results.append(copy.deepcopy(snap))
+            pipeline = VISILCorePipeline(graph)
+
+            output = pipeline.perceive(mode=mode)
+
+            results.append({
+                "timestamp": snap.get("timestamp", "unknown"),
+                "output": output
+            })
 
         return results
 
     # -------------------------
-    # DIFF BETWEEN STATES
+    # LATEST ONLY
     # -------------------------
-    def diff(self, a, b):
-        a_nodes = set(a.get("graph", {}).get("nodes", {}).keys())
-        b_nodes = set(b.get("graph", {}).get("nodes", {}).keys())
+    def latest(self, mode="focus"):
 
-        return {
-            "added": list(b_nodes - a_nodes),
-            "removed": list(a_nodes - b_nodes),
-            "stable": list(a_nodes & b_nodes)
-        }
+        if not self.snapshots:
+            return {}
+
+        last = self.snapshots[-1]
+
+        graph = last.get("graph") or last
+
+        pipeline = VISILCorePipeline(graph)
+
+        return pipeline.perceive(mode=mode)
