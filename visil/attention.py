@@ -1,30 +1,60 @@
-class AttentionEngine:
+"""
+VISIL Attention Layer
+
+Deterministic salience weighting over VISIL perception output.
+No state mutation. No side effects.
+"""
+
+def apply_attention(view: dict) -> dict:
     """
-    VISIL Attention Layer
-    Converts node structure into salience weights.
+    Applies salience weighting to VISIL node structures.
+
+    Expected input:
+        {
+            "nodes": {...},
+            "edges": {...},
+            ...
+        }
+
+    Returns:
+        dict with weighted attention applied
     """
 
-    def __init__(self, graph):
-        self.graph = graph
+    if not isinstance(view, dict):
+        return {"view": view}
 
-    def score(self, nodes):
-        """
-        Returns:
-            dict[node_id] -> float attention score
-        """
+    nodes = view.get("nodes", {})
+    edges = view.get("edges", {})
 
-        scores = {}
+    def score_node(node):
+        base = node.get("weight", 1.0)
 
-        for node_id, node in nodes.items():
+        concepts = node.get("concepts", [])
+        concept_boost = len(concepts) * 0.25
 
-            base = node.get("weight", 1.0)
+        timestamp = node.get("timestamp", None)
+        recency_bias = 0.1 if timestamp else 0.0
 
-            concepts = node.get("concepts", [])
-            concept_boost = len(concepts) * 0.25
+        return base + concept_boost + recency_bias
 
-            timestamp = node.get("timestamp", "")
-            recency_bias = 0.1 if timestamp else 0.0
+    weighted_nodes = {}
 
-            scores[node_id] = base + concept_boost + recency_bias
+    for node_id, node in nodes.items():
+        weighted_nodes[node_id] = {
+            **node,
+            "attention": score_node(node)
+        }
 
-        return scores
+    weighted_edges = {}
+
+    for edge_id, edge in edges.items():
+        weighted_edges[edge_id] = {
+            **edge,
+            "attention": edge.get("weight", 1.0)
+        }
+
+    return {
+        **view,
+        "nodes": weighted_nodes,
+        "edges": weighted_edges
+    }
