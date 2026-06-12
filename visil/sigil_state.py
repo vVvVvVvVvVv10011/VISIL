@@ -1,6 +1,5 @@
 import json
 import subprocess
-from visil.core_pipeline import VISILCorePipeline
 
 
 class SigilStateExtractor:
