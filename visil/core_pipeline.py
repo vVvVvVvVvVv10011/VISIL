@@ -1,47 +1,58 @@
-from visil.temporal_kernel import VISILTemporalKernel
-from visil.sigil_adapter import SigilAdapter
+from visil.lens_registry import get_default_lenses
+from visil.attention import apply_attention
 
 
 class VISILCorePipeline:
     """
-    Canonical VISIL execution engine.
+    VISIL Core Perception Pipeline
 
     Flow:
-    SIGIL → Temporal Kernel → Mode Execution
+        signal → lenses → merge → attention → view
     """
 
-    def __init__(self):
-        self.kernel = VISILTemporalKernel()
-        self.sigil = SigilAdapter()
+    def perceive(self, signal: dict, mode: str = "view", lenses=None) -> dict:
+        """
+        Main perception entrypoint.
 
-    # -----------------------------
-    # SINGLE ENTRY POINT
-    # -----------------------------
-    def perceive(self, graph, mode="view"):
+        Args:
+            signal: input graph or event state
+            mode: view | replay | field | drift
+            lenses: optional override lens set
+        """
 
-        # 1. SIGIL normalization layer
-        raw_state = self.sigil.load_history(graph)
-        state = self.sigil.to_initial_state(raw_state)
+        if lenses is None:
+            lenses = get_default_lenses()
 
-        # -----------------------------
-        # VIEW MODE (STATIC SNAPSHOT)
-        # -----------------------------
-        if mode == "view":
-            return self.kernel.integrate(state)
+        view = {}
 
-        # -----------------------------
-        # REPLAY MODE (TEMPORAL PASS)
-        # -----------------------------
-        elif mode == "replay":
-            return self.kernel.integrate(state)
+        for lens in lenses:
+            output = lens(signal)
 
-        # -----------------------------
-        # FIELD MODE (DYNAMIC SIMULATION)
-        # -----------------------------
-        elif mode == "field":
-            return self.kernel.step_live(state)
+            # each lens returns {node_id: data}
+            for node_id, data in output.items():
+                if node_id not in view:
+                    view[node_id] = data
+                else:
+                    view[node_id] = self._merge(view[node_id], data)
 
-        # -----------------------------
-        # SAFE FALLBACK
-        # -----------------------------
-        return self.kernel.integrate(state)
+        return {
+            "mode": mode,
+            "view": apply_attention(view)
+        }
+
+    def _merge(self, a: dict, b: dict) -> dict:
+        """
+        Merge lens outputs deterministically.
+        Numeric values are averaged.
+        Non-numeric values override.
+        """
+
+        merged = dict(a)
+
+        for k, v in b.items():
+            if isinstance(v, (int, float)):
+                merged[k] = (merged.get(k, 0) + v) / 2
+            else:
+                merged[k] = v
+
+        return merged

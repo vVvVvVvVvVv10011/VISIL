@@ -9,15 +9,23 @@ def load_graph(path):
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage:")
-        print("  python -m visil.cli view <graph.json>")
-        print("  python -m visil.cli replay <graph.json>")
-        print("  python -m visil.cli field <graph.json>")
+    args = sys.argv[1:]
+
+    if len(args) < 1:
+        print("VISIL commands:")
+        print("  visil view <graph.json>")
+        print("  visil replay <graph.json>")
+        print("  visil field <graph.json>")
+        print("  visil drift <graph.json>")
         return
 
-    command = sys.argv[1]
-    graph_path = sys.argv[2]
+    command = args[0]
+    graph_path = args[1] if len(args) > 1 else None
+
+    # SAFE DEFAULT
+    if not graph_path:
+        print("Missing graph.json")
+        return
 
     graph = load_graph(graph_path)
     pipeline = VISILCorePipeline()
@@ -30,6 +38,9 @@ def main():
 
     elif command == "field":
         result = pipeline.perceive(graph, mode="field")
+
+    elif command == "drift":
+        result = pipeline.perceive(graph, mode="drift")
 
     else:
         print(f"Unknown command: {command}")
