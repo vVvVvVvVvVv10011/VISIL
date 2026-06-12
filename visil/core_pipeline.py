@@ -1,48 +1,47 @@
-from visil.lenses import VISILLenses
-from visil.attention import AttentionEngine
-from visil.drift import DriftEngine
+from visil.temporal_kernel import VISILTemporalKernel
+from visil.sigil_adapter import SigilAdapter
 
 
 class VISILCorePipeline:
+    """
+    Canonical VISIL execution engine.
 
-    def __init__(self, graph):
+    Flow:
+    SIGIL → Temporal Kernel → Mode Execution
+    """
 
-        self.graph = graph
-        self.lenses = VISILLenses(graph)
-        self.attention = AttentionEngine(graph)
-        self.drift = DriftEngine(graph)
+    def __init__(self):
+        self.kernel = VISILTemporalKernel()
+        self.sigil = SigilAdapter()
 
-    # -------------------------
-    # MAIN PERCEPTION ENTRY
-    # -------------------------
-    def perceive(self, mode="focus"):
+    # -----------------------------
+    # SINGLE ENTRY POINT
+    # -----------------------------
+    def perceive(self, graph, mode="view"):
 
-        nodes = self.graph.get("nodes", {})
-        edges = self.graph.get("edges", [])
+        # 1. SIGIL normalization layer
+        raw_state = self.sigil.load_history(graph)
+        state = self.sigil.to_initial_state(raw_state)
 
-        view = self.lenses.apply(mode)
+        # -----------------------------
+        # VIEW MODE (STATIC SNAPSHOT)
+        # -----------------------------
+        if mode == "view":
+            return self.kernel.integrate(state)
 
-        attention_map = self.attention.score(nodes)
+        # -----------------------------
+        # REPLAY MODE (TEMPORAL PASS)
+        # -----------------------------
+        elif mode == "replay":
+            return self.kernel.integrate(state)
 
-        drift_map = self.drift.compute(nodes)
+        # -----------------------------
+        # FIELD MODE (DYNAMIC SIMULATION)
+        # -----------------------------
+        elif mode == "field":
+            return self.kernel.step_live(state)
 
-        enriched_nodes = []
-
-        for node_id, node in nodes.items():
-
-            enriched_nodes.append({
-                **node,
-                "attention": attention_map.get(node_id, 1.0),
-                "drift": drift_map.get(node_id, 0.0)
-            })
-
-        return {
-            "lens": mode,
-            "view": {n["id"]: n for n in enriched_nodes},
-            "attention": [
-                {"id": k, "attention": v}
-                for k, v in attention_map.items()
-            ],
-            "drift": drift_map,
-            "edges": edges
-        }
+        # -----------------------------
+        # SAFE FALLBACK
+        # -----------------------------
+        return self.kernel.integrate(state)
