@@ -1,30 +1,29 @@
-class AttentionEngine:
+"""
+VISIL Attention Layer
+
+Applies salience weighting to perception output.
+"""
+
+def apply_attention(view: dict) -> dict:
     """
-    VISIL Attention Layer
-    Converts node structure into salience weights.
+    Normalizes and weights node attention values.
     """
 
-    def __init__(self, graph):
-        self.graph = graph
+    if not isinstance(view, dict):
+        return {"view": {}}
 
-    def score(self, nodes):
-        """
-        Returns:
-            dict[node_id] -> float attention score
-        """
+    weighted = {}
 
-        scores = {}
+    for node_id, data in view.items():
 
-        for node_id, node in nodes.items():
+        attention = data.get("attention", 1.0)
 
-            base = node.get("weight", 1.0)
+        # clamp attention (stability constraint)
+        attention = max(0.1, min(attention, 2.0))
 
-            concepts = node.get("concepts", [])
-            concept_boost = len(concepts) * 0.25
+        weighted[node_id] = {
+            **data,
+            "attention": attention,
+        }
 
-            timestamp = node.get("timestamp", "")
-            recency_bias = 0.1 if timestamp else 0.0
-
-            scores[node_id] = base + concept_boost + recency_bias
-
-        return scores
+    return weighted
