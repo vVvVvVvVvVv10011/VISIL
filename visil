@@ -1,0 +1,57 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# ==============================================================================
+# VISIL: Virtually Isolated Illumination Layer
+# Author: Vera Lynn DeGraw
+# Version: 1.0.0
+# Description: Ephemeral, offline environment for observing LLM emergence.
+# ==============================================================================
+
+# 1. Define Isolated Roots
+VISIL_ROOT="$HOME/ai_lockdown/visil"
+SESSION_ID="visil_$(date +%s)"
+SESSION_DIR="$VISIL_ROOT/sessions/$SESSION_ID"
+LOG_DIR="$VISIL_ROOT/observations"
+LOG_FILE="$LOG_DIR/$SESSION_ID.log"
+
+# 2. Initialize Directories
+mkdir -p "$SESSION_DIR" "$LOG_DIR" "$VISIL_ROOT/models"
+
+# 3. Set Environment Variables (Isolation)
+export OLLAMA_MODELS="$VISIL_ROOT/models"
+export OLLAMA_HOME="$VISIL_ROOT/data"
+export VISIL_CONTEXT="$SESSION_DIR"
+
+# 4. User Feedback
+echo "💡 VISIL Active: Session $SESSION_ID"
+echo "   🔒 Isolation: Enabled (Host PATH preserved)"
+echo "   📝 Observation Log: $LOG_FILE"
+echo "   📦 Model Path: $OLLAMA_MODELS"
+echo "   ------------------------------------------------"
+echo "   Type 'illuminate' to start the observation window."
+echo "   Type 'exit' to extinguish the session and wipe context."
+echo "   ------------------------------------------------"
+
+# 5. Launch Ephemeral Subshell
+bash --init-file <(echo "
+    # Set Prompt
+    export PS1='[VISIL] \u@\h:\w\$ '
+    
+    # Re-export variables for subshell
+    export OLLAMA_MODELS='$VISIL_ROOT/models'
+    export OLLAMA_HOME='$VISIL_ROOT/data'
+    
+    # Define the 'illuminate' command
+    # Uses 'script' to record the entire session (input + output) to the log file
+    alias illuminate='echo \"Starting observation...\"; script -q -c \"ollama run qwen3.5:2b\" $LOG_FILE; echo \"Observation saved to $LOG_FILE\"'
+    
+    # Optional: Helper to list past observations
+    alias logs='ls -lh $LOG_DIR'
+    
+    echo 'Ready. Waiting for input...'
+")
+
+# 6. Post-Session Cleanup (Optional)
+# Uncomment the line below if you want to auto-delete the temporary session folder
+# rm -rf "$SESSION_DIR"
+echo "🌑 VISIL Session Extinguished."   
